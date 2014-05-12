@@ -11,16 +11,16 @@ import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 
 public class ClassPathScanner {
-    public static Iterable<String> getClassNames(ClassLoader classLoader, final String prefix) {
+    public static Iterable<String> getClassNames(ClassLoader classLoader, final String basePackage) {
         try {
             ClassPath classPath = ClassPath.from(classLoader);
+            final String agentPackage = ClassPathScanner.class.getPackage().getName();
             return transform(
                     filter(classPath.getAllClasses(), new Predicate<ClassPath.ClassInfo>() {
                         @Override
                         public boolean apply(ClassPath.ClassInfo classInfo) {
                             String className = classInfo.getName();
-                            return className.startsWith(prefix)
-                                    && !className.startsWith(ClassPathScanner.class.getPackage().getName());
+                            return className.startsWith(basePackage) && !className.startsWith(agentPackage);
                         }
                     }),
                     new Function<ClassPath.ClassInfo, String>() {
