@@ -11,14 +11,16 @@ import static com.google.common.collect.Iterables.filter;
 import static com.google.common.collect.Iterables.transform;
 
 public class ClassPathScanner {
-    public static Iterable<String> getClassNames(final String prefix) {
+    public static Iterable<String> getClassNames(ClassLoader classLoader, final String prefix) {
         try {
-            ClassPath classPath = ClassPath.from(ClassPathScanner.class.getClassLoader());
+            ClassPath classPath = ClassPath.from(classLoader);
             return transform(
                     filter(classPath.getAllClasses(), new Predicate<ClassPath.ClassInfo>() {
                         @Override
                         public boolean apply(ClassPath.ClassInfo classInfo) {
-                            return classInfo.getName().startsWith(prefix);
+                            String className = classInfo.getName();
+                            return className.startsWith(prefix)
+                                    && !className.startsWith(ClassPathScanner.class.getPackage().getName());
                         }
                     }),
                     new Function<ClassPath.ClassInfo, String>() {
@@ -31,9 +33,5 @@ public class ClassPathScanner {
         } catch (IOException e) {
             throw Throwables.propagate(e);
         }
-    }
-
-    public static void main(String[] args) throws Exception {
-        System.out.println(ClassPathScanner.getClassNames("de.mobile"));
     }
 }
