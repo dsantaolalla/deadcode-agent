@@ -78,24 +78,55 @@ public class DeadCodeAgent {
         message.put("className", className.replaceAll("/", "."));
         message.put("classLoader", classLoader.getClass().getName());
         message.put("parentClassLoader", classLoader.getParent() != null ? classLoader.getParent().getClass().getName() : "null");
+        message.put("referrers", getReferrers());
+        log(message);
+    }
 
+    private static List<String> getReferrers() {
         StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
         List<String> referrers = new ArrayList<String>(MAX_REFERRERS);
-        for (int i = 0; i < stackTrace.length && i < MAX_REFERRERS; i++) {
-            referrers.add(stackTrace[i].getClassName());
+
+        // gather class names referring to the loaded class; skip following entries:
+        // - first entry which is Thread.getStackTrace()
+        // - agent classes
+        // - jvm classes
+        // - container classes (Tomcat)
+        for (int i = 1; i < stackTrace.length && referrers.size() < MAX_REFERRERS; ) {
+            String referrer = stackTrace[i].getClassName();
+            if (canBeSkipped(referrer)) {
+                i++;
+                continue;
+            }
+            if (referrer.startsWith("org.springframework")) {
+                i = processSpring(stackTrace, referrers, i);
+            } else {
+                referrers.add(referrer);
+                i++;
+            }
         }
-        message.put("referrers", referrers);
+        return referrers;
+    }
 
-        /*
-        referrers=[
-        java.lang.Thread,
-        de.mobile.deadcode.DeadCodeAgent, 
-        de.mobile.deadcode.DeadCodeAgent,
-        de.mobile.deadcode.DeadCodeAgent$1,
-        sun.instrument.TransformerManager]
-         */
+    private static boolean canBeSkipped(String referrer) {
+        return referrer.startsWith(DeadCodeAgent.class.getPackage().getName())
+                || referrer.startsWith("java")
+                || referrer.startsWith("sun")
+                || referrer.startsWith("org.apache.catalina");
+    }
 
-        log(message);
+    private static int processSpring(StackTraceElement[] stackTrace, List<String> referrers, int i) {
+        // compress consecutive Spring referrers into the pseudo-referrer "Spring"
+        referrers.add("Spring");
+
+        int j = i + 1;
+        while (j < stackTrace.length) {
+            String referrer = stackTrace[j].getClassName();
+            if (!referrer.startsWith("org.springframework") && !canBeSkipped(referrer)) {
+                break;
+            }
+            j++;
+        }
+        return j;
     }
 
     private static void log(Map<String, Object> message) {
