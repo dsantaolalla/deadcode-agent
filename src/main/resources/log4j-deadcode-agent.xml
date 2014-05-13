@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
+
+<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
+
+    <appender name="file-logger" class="de.mobile.deadcode.org.apache.log4j.RollingFileAppender"> 
+        <param name="File" value="${log.agentDir}/deadcode-agent.log"/>
+        <param name="MaxFileSize" value="50MB" />
+        <param name="MaxBackupIndex" value="10" />
+        <layout class="de.mobile.deadcode.org.apache.log4j.PatternLayout"> 
+            <param name="ConversionPattern" value="%d %p [%t] [%c] - %m%n"/> 
+        </layout> 
+    </appender>
+    
+     <appender name="console-logger" class="de.mobile.deadcode.org.apache.log4j.ConsoleAppender"> 
+        <layout class="de.mobile.deadcode.org.apache.log4j.PatternLayout"> 
+            <param name="ConversionPattern" value="%d %p [%t] [%c] - %m%n"/> 
+        </layout> 
+    </appender>
+    
+     <appender name="logstash-logger" class="de.mobile.deadcode.org.apache.log4j.RollingFileAppender"> 
+        <param name="File" value="${log.agentDir}/deadcode-agent-logstash.log"/>
+        <layout class="de.mobile.deadcode.net.logstash.log4j.JSONEventLayoutV1"/> 
+    </appender>     
+    
+     <appender name="async-logger" class="de.mobile.deadcode.org.apache.log4j.AsyncAppender">
+        <param name="BufferSize" value="50000"/>
+        <appender-ref ref="file-logger"/>
+        <appender-ref ref="logstash-logger"/>
+    </appender>
+    
+
+    <root> 
+        <priority value ="INFO" />
+        <appender-ref ref="async-logger" />
+        <appender-ref ref="console-logger" />
+    </root>
+
+</log4j:configuration>
