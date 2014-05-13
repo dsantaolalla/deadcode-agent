@@ -27,13 +27,8 @@ public class DeadCodeAgent {
         }
 
         final String baseDirectory = basePackage.replaceAll("\\.", "/");
-//        DOMConfigurator.configure(DeadCodeAgent.class.getResource("log4j-deadcode-agent.xml"));
-        
-        DOMConfigurator.configure("/home/dboncompte/projects/deadcode-agent/src/main/resources/log4j-deadcode-agent.xml");
-        
-        
 
-//        PropertyConfigurator.configure(DeadCodeAgent.class.getResource("/log4j-deadcode-agent.xml"));
+        DOMConfigurator.configure(DeadCodeAgent.class.getResource("/log4j-deadcode-agent.xml"));
         logger = LoggerFactory.getLogger(DeadCodeAgent.class);
 
         final Map<ClassLoader, Boolean> classLoaders = new HashMap<ClassLoader, Boolean>();

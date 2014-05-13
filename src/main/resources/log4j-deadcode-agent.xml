@@ -33,7 +33,7 @@
     <root> 
         <priority value ="INFO" />
         <appender-ref ref="async-logger" />
-        <appender-ref ref="console-logger" />
+        <!--appender-ref ref="console-logger" /-->
     </root>
 
 </log4j:configuration>
