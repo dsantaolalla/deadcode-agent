@@ -11,7 +11,6 @@ import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -19,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static java.lang.Runtime.getRuntime;
@@ -26,32 +26,44 @@ import static java.util.Collections.synchronizedSet;
 
 public class DeadCodeAgent {
     private static final Logger logger;
-    private static final ExecutorService executor;
+    private static final ExecutorService SCANNER_EXECUTOR;
+    private static final ScheduledExecutorService LOGGER_EXECUTOR;
 
-    private static final int MAX_THREADS = 4;
+    private static final int MAX_SCANNER_THREADS = 4;
 
     static {
         DOMConfigurator.configure(DeadCodeAgent.class.getResource("/log4j-deadcode-agent.xml"));
         logger = LoggerFactory.getLogger(DeadCodeAgent.class);
 
-        executor = Executors.newFixedThreadPool(
-                MAX_THREADS, 
+        Thread.UncaughtExceptionHandler uncaughtExceptionHandler = new Thread.UncaughtExceptionHandler() {
+            @Override
+            public void uncaughtException(Thread t, Throwable e) {
+                logger.error(e.getMessage(), e);
+            }
+        };
+        SCANNER_EXECUTOR = Executors.newFixedThreadPool(
+                MAX_SCANNER_THREADS,
                 new ThreadFactoryBuilder()
                         .setDaemon(true)
-                        .setNameFormat("DeadCodeDetection-%d")
-                        .setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
-                            @Override
-                            public void uncaughtException(Thread t, Throwable e) {
-                                logger.error(e.getMessage(), e);
-                            }
-                        })
+                        .setNameFormat("DeadCodeScanner-%d")
+                        .setUncaughtExceptionHandler(uncaughtExceptionHandler)
+                        .build()
+        );
+
+        LOGGER_EXECUTOR = Executors.newScheduledThreadPool(
+                1,
+                new ThreadFactoryBuilder()
+                        .setDaemon(true)
+                        .setNameFormat("DeadCodeLogger-%d")
+                        .setUncaughtExceptionHandler(uncaughtExceptionHandler)
                         .build()
         );
 
         getRuntime().addShutdownHook(new Thread() {
             @Override
             public void run() {
-                executor.shutdownNow();
+                SCANNER_EXECUTOR.shutdownNow();
+                LOGGER_EXECUTOR.shutdownNow();
             }
         });
     }
@@ -73,21 +85,25 @@ public class DeadCodeAgent {
                                     byte[] classfileBuffer) throws IllegalClassFormatException {
 
                 if (!classLoaders.containsKey(classLoader)) {
+                    logger.info("Storing class loader: {}", classLoader);
                     classLoaders.put(classLoader, true);
+                    logger.info("Class loader count: {}", classLoaders.size());
 
-                    executor.execute(new Runnable() {
-                        @Override
-                        public void run() {
-                            for (String scannedClass : ClassPathScanner.getClassNames(classLoader, basePackage)) {
-                                SCAN_EVENTS.add(new ScanEvent(classLoader, scannedClass));
+                    if (classLoader != null) {
+                        SCANNER_EXECUTOR.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                for (String scannedClass : ClassPathScanner.getClassNames(classLoader, basePackage)) {
+                                    SCAN_EVENTS.add(new ScanEvent(classLoader, scannedClass));
+                                }
                             }
-                        }
-                    });
+                        });
+                    }
                 }
 
                 final String loadedClass = className.replaceAll("/", ".");
                 if (loadedClass.startsWith(basePackage)) {
-                    executor.execute(new Runnable() {
+                    SCANNER_EXECUTOR.execute(new Runnable() {
                         @Override
                         public void run() {
                             LOAD_EVENTS.add(new LoadEvent(classLoader, loadedClass, getReferrers()));
