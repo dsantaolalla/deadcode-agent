@@ -1,5 +1,6 @@
 package de.mobile.deadcode;
 
+import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.log4j.MDC;
 import org.apache.log4j.xml.DOMConfigurator;
 import org.slf4j.Logger;
@@ -10,14 +11,53 @@ import java.lang.instrument.IllegalClassFormatException;
 import java.lang.instrument.Instrumentation;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.lang.Runtime.getRuntime;
+import static java.util.Collections.synchronizedSet;
 
 public class DeadCodeAgent {
-    private static Logger logger;
+    private static final Logger logger;
+    private static final ExecutorService executor;
+
+    private static final int MAX_THREADS = 4;
+
+    static {
+        DOMConfigurator.configure(DeadCodeAgent.class.getResource("/log4j-deadcode-agent.xml"));
+        logger = LoggerFactory.getLogger(DeadCodeAgent.class);
+
+        executor = Executors.newFixedThreadPool(
+                MAX_THREADS, 
+                new ThreadFactoryBuilder()
+                        .setDaemon(true)
+                        .setNameFormat("DeadCodeDetection-%d")
+                        .setUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+                            @Override
+                            public void uncaughtException(Thread t, Throwable e) {
+                                logger.error(e.getMessage(), e);
+                            }
+                        })
+                        .build()
+        );
+
+        getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                executor.shutdownNow();
+            }
+        });
+    }
+
+    private static final Set<ScanEvent> SCAN_EVENTS = synchronizedSet(new HashSet<ScanEvent>());
+    private static final Set<LoadEvent> LOAD_EVENTS = synchronizedSet(new HashSet<LoadEvent>());
 
     public static void premain(String agentArgs, Instrumentation instrumentation) {
         final String basePackage = agentArgs;
@@ -25,25 +65,34 @@ public class DeadCodeAgent {
             throw new IllegalArgumentException("No base package specified");
         }
 
-        final String baseDirectory = basePackage.replaceAll("\\.", "/");
-
-        DOMConfigurator.configure(DeadCodeAgent.class.getResource("/log4j-deadcode-agent.xml"));
-        logger = LoggerFactory.getLogger(DeadCodeAgent.class);
-
         final Map<ClassLoader, Boolean> classLoaders = new HashMap<ClassLoader, Boolean>();
         instrumentation.addTransformer(new ClassFileTransformer() {
-            public byte[] transform(ClassLoader classLoader, String className,
+            public byte[] transform(final ClassLoader classLoader, String className,
                                     Class classBeingRedefined,
                                     ProtectionDomain protectionDomain,
                                     byte[] classfileBuffer) throws IllegalClassFormatException {
 
                 if (!classLoaders.containsKey(classLoader)) {
                     classLoaders.put(classLoader, true);
-                    printScannedClasses(classLoader, basePackage);
+
+                    executor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            for (String scannedClass : ClassPathScanner.getClassNames(classLoader, basePackage)) {
+                                SCAN_EVENTS.add(new ScanEvent(classLoader, scannedClass));
+                            }
+                        }
+                    });
                 }
 
-                if (className.startsWith(baseDirectory)) {
-                    printLoadedClass(classLoader, className);
+                final String loadedClass = className.replaceAll("/", ".");
+                if (loadedClass.startsWith(basePackage)) {
+                    executor.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            LOAD_EVENTS.add(new LoadEvent(classLoader, loadedClass, getReferrers()));
+                        }
+                    });
                 }
 
                 return null;
