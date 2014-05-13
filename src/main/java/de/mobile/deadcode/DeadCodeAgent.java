@@ -55,7 +55,7 @@ public class DeadCodeAgent {
         for (String className : ClassPathScanner.getClassNames(classLoader, basePackage)) {
             Map<String, Object> message = new HashMap<String, Object>();
             message.put("eventType", "deadCodeDetection");
-            message.put(className, "SCANNED");
+            message.put("eventValue", "classScanned");
             message.put("className", className);
             message.put("classLoader", classLoader.getClass().getName());
             message.put("parentClassLoader", classLoader.getParent() != null ? classLoader.getParent().getClass().getName() : "null");
@@ -63,13 +63,13 @@ public class DeadCodeAgent {
         }
     }
 
-    private static final int MAX_REFERRERS = 5;
+    private static final int MAX_REFERRERS = 20;
 
     private static void printLoadedClass(ClassLoader classLoader, String className) {
         Map<String, Object> message = new HashMap<String, Object>();
         message.put("eventType", "deadCodeDetection");
-        message.put(className, "LOADED");
-        message.put("className", className);
+        message.put("eventValue", "classLoaded");
+        message.put("className", className.replaceAll("/", "."));
         message.put("classLoader", classLoader.getClass().getName());
         message.put("parentClassLoader", classLoader.getParent() != null ? classLoader.getParent().getClass().getName() : "null");
 
