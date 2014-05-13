@@ -2,6 +2,7 @@ package de.mobile.deadcode;
 
 import org.apache.log4j.MDC;
 import org.apache.log4j.PropertyConfigurator;
+import org.apache.log4j.xml.DOMConfigurator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,8 +27,13 @@ public class DeadCodeAgent {
         }
 
         final String baseDirectory = basePackage.replaceAll("\\.", "/");
+//        DOMConfigurator.configure(DeadCodeAgent.class.getResource("log4j-deadcode-agent.xml"));
+        
+        DOMConfigurator.configure("/home/dboncompte/projects/deadcode-agent/src/main/resources/log4j-deadcode-agent.xml");
+        
+        
 
-        PropertyConfigurator.configure(DeadCodeAgent.class.getResource("/log4j-deadcode-agent.properties"));
+//        PropertyConfigurator.configure(DeadCodeAgent.class.getResource("/log4j-deadcode-agent.xml"));
         logger = LoggerFactory.getLogger(DeadCodeAgent.class);
 
         final Map<ClassLoader, Boolean> classLoaders = new HashMap<ClassLoader, Boolean>();
