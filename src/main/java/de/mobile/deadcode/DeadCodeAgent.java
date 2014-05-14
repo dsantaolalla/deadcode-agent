@@ -42,7 +42,7 @@ public class DeadCodeAgent {
                     printScannedClasses(classLoader, basePackage);
                 }
 
-                if (className.startsWith(baseDirectory)) {
+                if (className.startsWith(baseDirectory) && !className.startsWith(DeadCodeAgent.class.getPackage().getName())) {
                     printLoadedClass(classLoader, className);
                 }
 

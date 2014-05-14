@@ -29,7 +29,8 @@ if __name__ == "__main__":
 
         offset += size
 
-    print "Scanned classes:", len(scanned_classes)
+    scanned_classes_count = len(scanned_classes)
+    print "Scanned classes:", scanned_classes_count
 
     offset = 0
     loaded_count = 0
@@ -58,4 +59,8 @@ if __name__ == "__main__":
 
     print "Unused classes:", len(scanned_classes)
 
+    print "--------  SUMMARY -----------"
+    print "Scanned classes:", scanned_classes_count
+    print "Loaded classes:", loaded_count
+    print "Unused classes:", len(scanned_classes)
 
